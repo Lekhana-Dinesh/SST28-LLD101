@@ -43,21 +43,28 @@ public class ParkingLot {
         this.slotStrategy = slotStrategy;
     }
 
-    public synchronized Ticket park(Vehicle vehicle, Gate entryGate, SlotType slotType) {
-        ParkingSlot slot = slotStrategy.findAndReserveSlot(levels, entryGate, slotType);
+    // API: park(vehicleDetails, entryTime, requestedSlotType, entryGateID)
+    public synchronized Ticket park(Vehicle vehicle, LocalDateTime entryTime, SlotType requestedSlotType, String entryGateId) {
+        Gate gate = findGate(entryGateId);
+        ParkingSlot slot = slotStrategy.findAndReserveSlot(levels, gate, vehicle.getVehicleType(), requestedSlotType);
 
         if (slot == null) {
-            throw new NoSlotAvailableException("No slot available for type: " + slotType);
+            throw new NoSlotAvailableException("No compatible slot available for: " + vehicle.getVehicleType());
         }
 
         String ticketId = "TICKET-" + System.nanoTime();
-        Ticket ticket = new Ticket(ticketId, vehicle, slot, entryGate, LocalDateTime.now());
+        Ticket ticket = new Ticket(ticketId, vehicle, slot, gate, entryTime);
         activeTickets.put(ticketId, ticket);
 
         return ticket;
     }
 
-    public double exit(String ticketId) {
+    // API: exit(parkingTicket, exitTime)
+    public double exit(Ticket ticket, LocalDateTime exitTime) {
+        return exit(ticket.getTicketId(), exitTime);
+    }
+
+    public double exit(String ticketId, LocalDateTime exitTime) {
         Ticket ticket = activeTickets.remove(ticketId);
 
         if (ticket == null) {
@@ -69,10 +76,11 @@ public class ParkingLot {
         return feeCalculator.calculateFee(
                 ticket.getParkingSlot().getSlotType(),
                 ticket.getEntryTime(),
-                LocalDateTime.now()
+                exitTime
         );
     }
 
+    // API: status()
     public String status() {
         Map<SlotType, Integer> freeCounts = new ConcurrentHashMap<>();
         freeCounts.put(SlotType.SMALL, 0);
@@ -94,6 +102,13 @@ public class ParkingLot {
         return "Status -> SMALL: " + freeCounts.get(SlotType.SMALL) +
                 ", MEDIUM: " + freeCounts.get(SlotType.MEDIUM) +
                 ", LARGE: " + freeCounts.get(SlotType.LARGE);
+    }
+
+    private Gate findGate(String gateId) {
+        for (Gate gate : gates) {
+            if (gate.getGateId().equals(gateId)) return gate;
+        }
+        throw new IllegalArgumentException("Gate not found: " + gateId);
     }
 
     public List<ParkingLevel> getLevels() {

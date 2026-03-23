@@ -39,8 +39,9 @@ public class Ticket {
     public String toString() {
         return "Ticket{" +
                 "ticketId='" + ticketId + '\'' +
-                ", vehicle=" + vehicle.getVehicleNumber() +
-                ", slot=" + parkingSlot.getSlotId() +
+                ", vehicle=" + vehicle.getVehicleNumber() + " (" + vehicle.getVehicleType() + ")" +
+                ", slotId=" + parkingSlot.getSlotId() +
+                ", slotType=" + parkingSlot.getSlotType() +
                 ", entryGate=" + entryGate.getGateId() +
                 ", entryTime=" + entryTime +
                 '}';

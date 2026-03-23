@@ -7,11 +7,11 @@ public class RandomSlotStrategy implements SlotStrategy {
     private final Random random = new Random();
 
     @Override
-    public ParkingSlot findAndReserveSlot(List<ParkingLevel> levels, Gate entryGate, SlotType slotType) {
+    public ParkingSlot findAndReserveSlot(List<ParkingLevel> levels, Gate entryGate, VehicleType vehicleType, SlotType requestedSlotType) {
         List<ParkingSlot> candidates = new ArrayList<>();
 
         for (ParkingLevel level : levels) {
-            candidates.addAll(level.getSlotsByType(slotType));
+            candidates.addAll(level.getSlotsByType(requestedSlotType));
         }
 
         Collections.shuffle(candidates, random);
