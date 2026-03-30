@@ -1,91 +1,139 @@
 # Parking Lot — LLD
 
-A multilevel parking lot system supporting vehicle entry/exit across multiple gates. Assigns the nearest compatible slot based on the entry gate, calculates fees by slot type (not vehicle type), and handles vehicles parking in larger slots when their preferred size is unavailable.
+A multilevel parking lot system with multiple gates. It assigns the nearest compatible slot, generates tickets, and calculates fees by **allocated slot type**.
 
----
-
-## Functional Requirements Covered
-
-- **Slot types** — Small (2-wheelers), Medium (cars), Large (buses) with separate hourly rates.
-- **Nearest slot assignment** — slots are ranked by distance to the entry gate; the closest available slot is assigned.
-- **Vehicle-in-larger-slot fallback** — if the preferred slot type is full, the system automatically assigns the next compatible larger slot (bike → Small/Medium/Large; car → Medium/Large; bus → Large only).
-- **Fee calculation** — billed by the *allocated slot type*, not the vehicle type. A bike parked in a Large slot pays the Large rate.
-- **Multi-gate support** — each gate has its own distance mapping to every slot, so nearest-slot logic works per gate.
-- **Ticket tracking** — each ticket stores vehicle details, allocated slot, slot type, and entry time. Exit requires the ticket and an explicit exit time.
-
----
+## Features
+- **Slot types**: Small, Medium, Large
+- **Nearest slot allocation** from the entry gate
+- **Larger-slot fallback**:
+  - Bike → Small / Medium / Large
+  - Car → Medium / Large
+  - Bus → Large only
+- **Billing by allocated slot type**
+- **Multiple gates** with per-slot distance mapping
+- **Ticket tracking** with vehicle, slot, slot type, gate, and entry time
 
 ## Design Patterns
+- **Singleton**: `ParkingLot`
+- **Strategy**: `SlotStrategy`
+  - `NearestSlotStrategy`
+  - `RandomSlotStrategy`
 
-### Singleton — `ParkingLot`
-There is exactly one parking lot instance shared across all gates and levels. Singleton with double-checked locking ensures this without re-initialising on every access.
+## Mermaid UML
+```mermaid
+classDiagram
+    class ParkingLot {
+        -List~ParkingLevel~ levels
+        -List~Gate~ gates
+        -FeeCalculator feeCalculator
+        -SlotStrategy slotStrategy
+        -Map~String, Ticket~ activeTickets
+        +park(Vehicle, LocalDateTime, SlotType, String) Ticket
+        +status() String
+        +exit(Ticket, LocalDateTime) double
+    }
 
-### Strategy — `SlotStrategy`
-Slot allocation logic is behind an interface (`SlotStrategy`), making it swappable without touching `ParkingLot`. `NearestSlotStrategy` picks the closest compatible slot; `RandomSlotStrategy` is provided as an alternative. Adding a new strategy (e.g. prioritise a specific level) requires no changes to existing classes.
+    class ParkingLevel {
+        -String levelId
+        -Map~SlotType, List~ParkingSlot~~ slotMapping
+        +getSlotsByType(SlotType) List~ParkingSlot~
+    }
 
-### Factory-style setup (in `Main`)
-Slots, levels, gates, rates, and strategies are assembled in `Main` before being handed to `ParkingLot.getInstance()`. This keeps construction logic separate from the parking lot's operational logic.
+    class ParkingSlot {
+        -String slotId
+        -SlotType slotType
+        -Map~String, Double~ distanceToGateMap
+        -boolean occupied
+        +reserve() boolean
+        +release() void
+        +getDistanceFromGate(String) double
+    }
 
----
+    class Gate {
+        -String gateId
+    }
 
-## Class Structure
+    class Vehicle {
+        -String vehicleNumber
+        -VehicleType vehicleType
+    }
 
+    class Ticket {
+        -String ticketId
+        -Vehicle vehicle
+        -ParkingSlot parkingSlot
+        -SlotType allocatedSlotType
+        -Gate entryGate
+        -LocalDateTime entryTime
+    }
+
+    class FeeCalculator {
+        -Map~SlotType, Double~ hourlyRateMap
+        +calculateFee(SlotType, LocalDateTime, LocalDateTime) double
+    }
+
+    class SlotStrategy {
+        <<interface>>
+        +findAndReserveSlot(List~ParkingLevel~, VehicleType, SlotType, Gate) ParkingSlot
+    }
+
+    class NearestSlotStrategy {
+        +findAndReserveSlot(List~ParkingLevel~, VehicleType, SlotType, Gate) ParkingSlot
+    }
+
+    class RandomSlotStrategy {
+        +findAndReserveSlot(List~ParkingLevel~, VehicleType, SlotType, Gate) ParkingSlot
+    }
+
+    class SlotType {
+        <<enum>>
+        SMALL
+        MEDIUM
+        LARGE
+    }
+
+    class VehicleType {
+        <<enum>>
+        BIKE
+        CAR
+        BUS
+    }
+
+    ParkingLot --> ParkingLevel
+    ParkingLot --> Gate
+    ParkingLot --> FeeCalculator
+    ParkingLot --> SlotStrategy
+    ParkingLot --> Ticket
+    ParkingLevel --> ParkingSlot
+    Ticket --> Vehicle
+    Ticket --> ParkingSlot
+    Ticket --> Gate
+    ParkingSlot --> SlotType
+    Vehicle --> VehicleType
+    NearestSlotStrategy ..|> SlotStrategy
+    RandomSlotStrategy ..|> SlotStrategy
 ```
-ParkingLot (Singleton)
-├── has-many  ParkingLevel
-│             └── has-many  ParkingSlot  (SlotType, distance-to-gate map)
-├── has-many  Gate
-├── has-a     FeeCalculator              (hourly rates per SlotType)
-└── has-a     SlotStrategy
-              ├── NearestSlotStrategy    (sorts by gate distance, tries compatible slot types)
-              └── RandomSlotStrategy
 
-Ticket  — vehicle, slot, slot type, entry gate, entry time
-
-Enums:      SlotType (SMALL, MEDIUM, LARGE)
-            VehicleType (BIKE, CAR, BUS)
-Exceptions: NoSlotAvailableException, InvalidTicketException
-```
-
----
+## Main Classes
+- `ParkingLot` → main APIs: `park`, `status`, `exit`
+- `ParkingLevel` → one floor of slots
+- `ParkingSlot` → one slot with type, occupancy, and gate distances
+- `Gate` → entry/exit point
+- `Vehicle` → vehicle details
+- `Ticket` → parking record
+- `FeeCalculator` → computes bill
+- `SlotStrategy` → slot allocation rule
 
 ## API
-
 ```java
 Ticket ticket = parkingLot.park(vehicle, entryTime, requestedSlotType, entryGateId);
 String availability = parkingLot.status();
 double fee = parkingLot.exit(ticket, exitTime);
 ```
 
----
-
-## Compile & Run
-
+## Run
 ```bash
 cd ParkingLot
 javac *.java
 java Main
-```
-
-Requires Java 9+ (uses `Map.of`).
-
----
-
-## Sample Output
-
-```
-Parked: Ticket{ticketId='TICKET-...', vehicle=KA01AB1234 (BIKE), slotId=S1, slotType=SMALL, entryGate=G1, entryTime=...}
-Parked: Ticket{ticketId='TICKET-...', vehicle=KA02CD5678 (CAR), slotId=M1, slotType=MEDIUM, entryGate=G2, entryTime=...}
-Status -> SMALL: 1, MEDIUM: 0, LARGE: 1
-
-All SMALL slots occupied now.
-Status -> SMALL: 0, MEDIUM: 0, LARGE: 1
-
-Bike requested SMALL but no slot available → assigned larger slot:
-Parked: Ticket{..., vehicle=KA04GH0001 (BIKE), slotId=L1, slotType=LARGE, ...}
-
-Exit: TICKET-... | Slot type: SMALL | Fee = 40.0
-Exit: TICKET-... | Slot type: LARGE (bike in larger slot) | Fee = 160.0
-
-Status -> SMALL: 1, MEDIUM: 0, LARGE: 1
 ```
