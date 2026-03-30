@@ -1,99 +1,147 @@
 # Snakes & Ladders — LLD
 
-A turn-based Snakes and Ladders game played on a randomly generated n×n board. The board is populated with exactly n snakes and n ladders, placed without creating jump cycles. Players take turns rolling a dice and moving; the first to land exactly on the last cell wins.
+A simple turn-based **Snakes and Ladders** game on a random `n × n` board.
+The board has exactly **n snakes** and **n ladders**, placed without creating cycles.
+Players roll a dice, move in turns, and must land **exactly** on the last cell to win.
 
----
+## Features
 
-## Requirements Covered
+- User input for:
+  - board dimension `n`
+  - number of players
+  - difficulty: `easy` / `hard`
+- Board size = `n²`
+- Exactly `n` snakes and `n` ladders
+- No jump cycles
+- Queue-based turn handling
+- Exact win condition
+- Strategy pattern for difficulty
+- Factory pattern for board and game creation
 
-- **n×n board** — dimension is user-supplied; board has `n²` cells.
-- **n snakes and n ladders** — `BoardFactory` randomly places exactly n of each; heads/tails and starts are never reused.
-- **Turn-based play** — players cycle through a queue; each rolls once per turn.
-- **Difficulty** — `easy`: overshooting the board keeps the player in place. `hard`: overshooting loses the turn (same effect, stricter framing).
-- **Win condition** — a player wins by landing exactly on the last cell; they are removed from the queue and ranked.
-- **No-cycle guarantee** — before placing any snake or ladder, `BoardFactory` traces the chain from the destination and rejects the placement if it would create a loop.
+## Main Classes
 
----
+- `Main` → takes input and starts the game
+- `Game` → controls turns and winners
+- `Board` → stores board size and snakes/ladders
+- `BoardFactory` → creates random valid board
+- `GameFactory` → creates `Game`
+- `Player` → stores name and position
+- `Dice` → rolls `1` to `6`
+- `Snake`, `Ladder` → special jumps
+- `IMakeMoveStrategy` → move rule interface
+- `Easy`, `Hard` → difficulty strategies
+- `JumpStrategy` → common interface for snake/ladder
 
-## Design Patterns
+## Mermaid UML Diagram
 
-### Strategy — `IMakeMoveStrategy`
-Move logic (overshoot handling, logging) is behind an interface, making `Easy` and `Hard` interchangeable without touching `Game`. New difficulty variants can be added with no changes to existing classes.
+```mermaid
+classDiagram
+    class Main {
+        +main(String[] args)
+    }
 
-### Strategy — `JumpStrategy`
-`Snake` and `Ladder` both implement `JumpStrategy` with a single `jump()` method. `Board` stores them in a unified `Map<Integer, JumpStrategy>`, so position resolution is one call regardless of what kind of special cell it is.
+    class Game {
+        -Queue~Player~ activePlayers
+        -List~Player~ winners
+        -Board board
+        -Dice dice
+        -IMakeMoveStrategy moveStrategy
+        +start()
+    }
 
-### Factory — `BoardFactory` and `GameFactory`
-Construction complexity (random placement, cycle checking, wiring players/dice/strategy) is isolated from `Main`. `GameFactory` keeps `Game` construction behind a single call; `BoardFactory` encapsulates the full board generation algorithm.
+    class Board {
+        -int dimension
+        -int size
+        -Map~Integer, JumpStrategy~ specialCells
+        +getDimension() int
+        +getSize() int
+        +resolvePosition(int) int
+    }
 
----
+    class BoardFactory {
+        +createRandomBoard(int) Board
+    }
 
-## Class Structure
+    class GameFactory {
+        +createGame(List~Player~, Board, Dice, IMakeMoveStrategy) Game
+    }
 
+    class Player {
+        -String name
+        -int position
+        +getName() String
+        +getPosition() int
+        +setPosition(int) void
+        +win(int) boolean
+    }
+
+    class Dice {
+        +genRandNo() int
+    }
+
+    class JumpStrategy {
+        <<interface>>
+        +jump() int
+    }
+
+    class Snake {
+        -int start
+        -int end
+        +jump() int
+    }
+
+    class Ladder {
+        -int start
+        -int end
+        +jump() int
+    }
+
+    class IMakeMoveStrategy {
+        <<interface>>
+        +makeMove(Player, Board, Dice) void
+    }
+
+    class Easy {
+        +makeMove(Player, Board, Dice) void
+    }
+
+    class Hard {
+        +makeMove(Player, Board, Dice) void
+    }
+
+    Main --> BoardFactory
+    Main --> GameFactory
+    GameFactory --> Game
+    BoardFactory --> Board
+    Game --> Player
+    Game --> Board
+    Game --> Dice
+    Game --> IMakeMoveStrategy
+    Board --> JumpStrategy
+    Snake ..|> JumpStrategy
+    Ladder ..|> JumpStrategy
+    Easy ..|> IMakeMoveStrategy
+    Hard ..|> IMakeMoveStrategy
 ```
-Game
-├── has-many  Player              (position, name)
-├── has-a     Board
-│             └── Map<Integer, JumpStrategy>
-│                 ├── Snake      (jumps down)
-│                 └── Ladder     (jumps up)
-├── has-a     Dice
-└── has-a     IMakeMoveStrategy
-              ├── Easy
-              └── Hard
 
-BoardFactory  → produces Board
-GameFactory   → produces Game
-```
-
----
-
-## Compile & Run
+## Run
 
 ```bash
-cd "Snake&Ladders"
 javac *.java
 java Main
 ```
 
-**Example input:**
-```
+## Example Input
+
+```text
 Enter board dimension n (board will be n x n): 5
 Enter number of players: 2
 Enter difficulty level (easy/hard): easy
 ```
 
-Requires Java 8+.
+## Notes
 
----
-
-## Sample Output
-
-```
-Generated board details:
-Board size: 5 x 5 = 25 cells
-Snakes and ladders count each: 5
-Ladder : 3  -> 11
-Ladder : 7  -> 20
-Snake  : 17 -> 4
-Snake  : 22 -> 9
-...
-
-Game started on a 5x5 board.
-
-P1 rolled: 4
-P1 climbed a ladder from 4 to 14
-P1 moved to: 14
-
-P2 rolled: 6
-P2 moved to: 6
-
-...
-
-P1 rolled: 3
-P1 finished at rank 1!
-
-Game over.
-Winners order:
-1. P1
-```
+- Players start at `0`
+- A player wins only by reaching exactly `n²`
+- Overshooting does not move the player
+- Winners are ranked in order
