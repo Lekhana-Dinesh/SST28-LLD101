@@ -1,20 +1,25 @@
-Flat Folder Elevator System
-==========================
+Elevator System
 
-This version keeps all .java files in one folder.
-There are no package declarations, so it is easier to open and run in a student setup.
+This project is a Low Level Design of a multiple elevator system.
 
-How to compile:
-    javac *.java
+Features:
+- Multiple elevators
+- Only 2 outside buttons on each floor: UP and DOWN
+- Inside elevator panel with floor buttons, open, close, and alarm
+- Different elevator assignment strategies
+- Different elevator scheduling strategies
+- Alarm stops all elevators
+- Sensor-based current floor update
+
+Main idea:
+When a user presses an outside floor button, an external request is created.
+The controller receives the request and uses an assignment strategy to choose one elevator.
+After that, the selected elevator uses its own scheduling strategy to decide stop order.
+
+This design keeps assignment logic and movement logic separate, so different algorithms can be used easily.
 
 How to run:
-    java Main
-
-Main features:
-- multiple elevators
-- 2 outside buttons per floor: UP and DOWN
-- inside floor buttons, door open, door close, alarm
-- assignment strategy separate from controller
-- scheduling strategy inside elevator
-- global alarm stops all elevators
-- sensor abstraction for current floor
+1. Compile all files:
+   javac *.java
+2. Run:
+   java Main
